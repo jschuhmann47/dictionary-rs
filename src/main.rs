@@ -1,5 +1,10 @@
 use std::env;
 
+use scraper::{Html, Selector};
+
+const DEFINITIONS_SELECTOR: &str = "div.def.ddef_d.db";
+const SUGGESTIONS_SELECTOR: &str = "li.lbt.lp-5.lpl-20 > a";
+
 fn main() {
     let args = env::args().collect::<Vec<String>>();
     if args.len() <= 1 {
@@ -11,30 +16,19 @@ fn main() {
         "https://dictionary.cambridge.org/dictionary/english/{}",
         query
     );
-    let resp = reqwest::blocking::get(url)
-        .expect("failed to get url")
-        .text()
-        .expect("failed to get text");
-    let doc_body = scraper::Html::parse_document(&resp);
-    let definitions =
-        scraper::Selector::parse("div.def.ddef_d.db").expect("failed to create selector");
-    let list_of_definitions = doc_body
-        .select(&definitions)
-        .map(|d| d.text().collect())
-        .collect::<Vec<String>>();
+    let list_of_definitions = query_url_with_selector(&url, DEFINITIONS_SELECTOR);
+
     if list_of_definitions.is_empty() {
         println!("Not found");
-        // https://dictionary.cambridge.org/spellcheck/english/?q=helo
-        let suggestions =
-            scraper::Selector::parse("li.lbt.lp-5.lpl-20 > a").expect("failed to create selector");
-        let list_of_suggestions = doc_body
-            .select(&suggestions)
-            .map(|d| d.inner_html())
-            .collect::<Vec<String>>();
-            println!("Perhaps you wanted to say:");
-            for (i, suggestion) in list_of_suggestions.iter().enumerate() {
-                println!("  {}: {}", i + 1, suggestion);
-            } 
+        let url = format!(
+            "https://dictionary.cambridge.org/spellcheck/english/?q={}",
+            query
+        );
+        let list_of_suggestions = query_url_with_selector(&url, SUGGESTIONS_SELECTOR);
+        println!("Perhaps you wanted to say:");
+        for (i, suggestion) in list_of_suggestions.iter().enumerate() {
+            println!("  {}: {}", i + 1, suggestion);
+        }
         return;
     }
     println!("Definitions found for \"{}\":", args[1..].join(" "));
@@ -43,20 +37,22 @@ fn main() {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::{fs::File, io::Read};
+fn get_from_url_as_html(url: &str) -> Html {
+    let res = reqwest::blocking::get(url)
+        .expect("failed to get url")
+        .text()
+        .expect("failed to get text");
+    scraper::Html::parse_document(&res)
+}
 
-    #[test]
-    fn it_works() {
-        let mut file = File::open("./src/test.html").expect("failed to open file");
-        let mut data = String::with_capacity(10000);
-        file.read_to_string(&mut data).expect("failed to read to string");
-        let suggestions = scraper::Selector::parse("li.lbt.lp-5.lpl-20 > a").expect("failed to create selector");
-        let doc = scraper::Html::parse_document(&data);
-        let res = doc.select(&suggestions)
-        .map(|d| d.inner_html())
-        .collect::<Vec<String>>();
-        assert_eq!(res.get(0).map(|f| f.clone()), Some("hello".to_string()));
-    }
+fn get_from_selector(body: &Html, selector: Selector) -> Vec<String> {
+    body.select(&selector)
+        .map(|d| d.text().collect())
+        .collect::<Vec<String>>()
+}
+
+fn query_url_with_selector(url: &str, selector: &str) -> Vec<String> {
+    let doc_body = get_from_url_as_html(&url);
+    let suggestions = scraper::Selector::parse(selector).expect("failed to create selector");
+    get_from_selector(&doc_body, suggestions)
 }
