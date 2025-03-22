@@ -3,7 +3,7 @@ use std::env;
 fn main() {
     let args = env::args().collect::<Vec<String>>();
     if args.len() <= 1 {
-        println!("missing expression");
+        println!("Missing arguments!");
         return;
     }
     let query = args[1..].join("-");
@@ -16,16 +16,17 @@ fn main() {
         .text()
         .expect("failed to get text");
     let doc_body = scraper::Html::parse_document(&resp);
-    let definitions = scraper::Selector::parse("div.def.ddef_d.db").expect("failed to select");
+    let definitions = scraper::Selector::parse("div.def.ddef_d.db").expect("failed to create selector");
     let list_of_definitions = doc_body
         .select(&definitions)
         .map(|d| d.text().collect())
         .collect::<Vec<String>>();
     if list_of_definitions.is_empty() {
-        println!("not found");
+        println!("Not found");
         return;
     }
-    for definition in list_of_definitions {
-        println!("{}", &definition[0..definition.len() - 2]);
+    println!("Definitions found for \"{}\":", args[1..].join(" "));
+    for (i, definition) in list_of_definitions.iter().enumerate() {
+        println!("  {}: {}", i+1, &definition[0..definition.len() - 2]);
     }
 }
