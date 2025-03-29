@@ -1,4 +1,4 @@
-use std::env;
+use std::{collections::HashSet, env};
 
 use scraper::{Html, Selector};
 
@@ -32,13 +32,17 @@ fn main() {
         return;
     }
     println!("Definitions found for \"{}\":", args[1..].join(" "));
-    for (i, definition) in list_of_definitions.iter().enumerate() {
+    for (i, definition) in remove_duplicates(list_of_definitions).iter().enumerate() {
         // this is to truncate the ending like "foo:" to just "foo"
         let mut chars_to_extract = 0;
         if definition.ends_with(":") {
             chars_to_extract = 1;
         }
-        println!("  {}: {}", i + 1, &definition[0..definition.len() - chars_to_extract]);
+        println!(
+            "  {}: {}",
+            i + 1,
+            &definition[0..definition.len() - chars_to_extract]
+        );
     }
 }
 
@@ -61,4 +65,11 @@ fn get_selectors_from_url(url: &str, selector: &str) -> Vec<String> {
     let doc_body = get_url_as_html(&url);
     let suggestions = scraper::Selector::parse(selector).expect("failed to create selector");
     get_selectors(&doc_body, suggestions)
+}
+
+fn remove_duplicates(list: Vec<String>) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut new_list = list.clone();
+    new_list.retain(|c| seen.insert(c.to_string()));
+    new_list
 }
