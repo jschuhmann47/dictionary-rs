@@ -33,8 +33,12 @@ fn main() {
     }
     println!("Definitions found for \"{}\":", args[1..].join(" "));
     for (i, definition) in list_of_definitions.iter().enumerate() {
-        // the len - 2 is to truncate the ending that comes like "foo: " to just "foo"
-        println!("  {}: {}", i + 1, &definition[0..definition.len() - 2]);
+        // this is to truncate the ending like "foo:" to just "foo"
+        let mut chars_to_extract = 0;
+        if definition.ends_with(":") {
+            chars_to_extract = 1;
+        }
+        println!("  {}: {}", i + 1, &definition[0..definition.len() - chars_to_extract]);
     }
 }
 
@@ -48,7 +52,8 @@ fn get_url_as_html(url: &str) -> Html {
 
 fn get_selectors(body: &Html, selector: Selector) -> Vec<String> {
     body.select(&selector)
-        .map(|d| d.text().collect())
+        .map(|d| d.text().collect::<String>())
+        .map(|t| t.trim_matches('→').trim().to_string())
         .collect::<Vec<String>>()
 }
 
