@@ -1,12 +1,12 @@
 use std::{collections::HashSet, env};
 
-use scraper::{Html, Selector};
+use reqwest::StatusCode;
 
-const BASE_API_URL: &str = "https://api.dictionaryapi.dev";
+use crate::definitions::WordDefinition;
 
-struct DefinitionResponse {
-    
-}
+const BASE_API_URL: &str = "https://dictionary-api.eliaschen.dev";
+
+mod definitions;
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
@@ -15,11 +15,17 @@ fn main() {
         return;
     }
     let query = args[1..].join("%20");
-    let url = format!("{}/api/v2/entries/en/{}",BASE_API_URL.to_string(), query);
+    let url = format!("{}/api/dictionary/en/{}", BASE_API_URL.to_string(), query);
     let client = reqwest::blocking::Client::builder()
         .build()
         .expect("failed to build client");
-    let list_of_definitions = get_definitions(&client, &url).expect("failed to get definitions");
+    let list_of_definitions = match get_definitions(&client, &url){
+        Ok(def) => def,
+        Err(e) => {
+            println!("Error occurred: {:?}", e);
+            return;
+        }
+    };
 
     if list_of_definitions.is_empty() {
         println!("Expression not found");
@@ -40,8 +46,18 @@ fn main() {
 }
 
 fn get_definitions(client: &reqwest::blocking::Client, url: &str) -> Result<Vec<String>, String> {
-    let res = DefinitionResponse{};
-    client.get(url).json(json)
+    let word_response = match client.get(url).send() {
+        Ok(res) => 
+        match res.status() {
+            StatusCode::OK =>  res
+                .json::<WordDefinition>()
+                .map_err(|_| "failed to deserialize".to_string())?,
+            StatusCode::NOT_FOUND => return Err("not found".to_string()),
+            s => return Err(format!("unhandled status code {}", s))
+        }
+        Err(_) => return Err("failed to GET".to_string()),
+    };
+    Ok(word_response.get_definitions())
 }
 
 fn remove_duplicates(list: Vec<String>) -> Vec<String> {
